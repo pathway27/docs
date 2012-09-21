@@ -9,6 +9,7 @@
   var seq = Parsers.seq;
   var opt = Parsers.opt;
   var or = Parsers.or;
+  var and = Parsers.and;
 
   // source is the doc comment between the /** and */
   DocCommentParser = function (source) {
@@ -35,7 +36,7 @@
     return new Error(msg);
   };
 
-  var regex = function (r) {
+  var regexImpl = function (r, peek) {
     var flags = 'g' + (r.ignoreCase ? 'i' : '') + (r.multiline ? 'm' : '');
     r = new RegExp(r.source, flags);
     // simulate "sticky" regular expression that only matches
@@ -70,10 +71,20 @@
             // map this to [] to return a truthy value
             result = [];
         }
+        if (peek)
+          return result ? [] : null;
         if (typeof result === "string")
           t.pos += result.length;
         return result;
       });
+  };
+
+  var regex = function (r) {
+    return regexImpl(r);
+  };
+
+  var regexPeek = function (r) {
+    return regexImpl(r, true);
   };
 
   var whitespace = expecting('whitespace', regex(/\s+/));
@@ -89,29 +100,84 @@
   // "paragraph break" is a newline followed by one or more blank lines,
   // where a blank line may have whitespace.  End of string is as good
   // as a newline.  Trailing and leading whitespace is included.
-  var paraBreak = expecting(
-    'end of paragraph',
-    regex(/[^\S\n]*($|\n)([^\S\n]*($|\n))+[^\S\n]*/));
+  var rParaBreak = /[^\S\n]*($|\n)([^\S\n]*($|\n))+[^\S\n]*/;
+  var paraBreak = expecting('end of paragraph', regex(rParaBreak));
+  var atParaBreak = expecting('end of paragraph', regexPeek(rParaBreak));
 
   DocCommentParser.prototype.getTree = function () {
-//    var signature =
-//          node('syntax', seq(whitespace,
-//                             node('name', regex(/[^\s\(]+/))));
+    var signature =
+          node('syntax',
+               seq(node('name', regex(/[^\s\(]+/)),
+                   opt(whitespaceInPara),
+                   // for better error messages, if we are looking
+                   // at a non-whitespace besides [ or (, error
+                   // now.
+                   expecting('(', regexPeek(/(?!\S)|\(|\[/)),
+                   opt(node('parameters',
+                            seq(regex(/\(/),
+                                opt(list(or(regex(/[^\s\)]+/),
+                                            whitespaceInPara))),
+                                expecting(')', regex(/\)/))))),
+                   opt(whitespaceInPara),
+                   // for better error messages, if we are looking
+                   // at a non-whitespace besides [, error now.
+                   expecting('[', regexPeek(/(?!\S)|\[/)),
+                   opt(seq(regex(/\[/),
+                           node('locus', regex(/[^\s\]]+/)),
+                           expecting(']', regex(/\]/)))),
+                   paraBreak));
+
 
     //var comment = node('comment', seq(signature, opt(whitespace),
     //expecting('block', blockBreak())));
 
     // Toy parser, parse "paragraphs" consisting of "words" (\w+).
 
-    var word = expecting('word', regex(/\w+/));
+    //var word = expecting('word', regex(/\w+/));
     var paragraph = node(
-      'paragraph', list(word, whitespaceInPara));
-    var content = opt(list(seq(paragraph, paraBreak)));
+      'paragraph',
+      seq(list(regex(/\S+/), whitespaceInPara), paraBreak));
+    //var content = opt(list(seq(paragraph, paraBreak)));
+
+    var note = node(
+      'note', seq(regex(/note:/i), whitespaceInPara, paragraph));
+
+    var arg = node(
+      'arg', seq(
+        regex(/-(?!\S)/),
+        opt(whitespaceInPara),
+        node('argName', regex(/[^\s:]+/)),
+        opt(whitespaceInPara),
+        opt(seq(regex(/\(/),
+                node('argType',
+                     opt(list(or(regex(/[^\s\)]+/),
+                                 whitespaceInPara)))),
+                expecting(')', regex(/\)/)))),
+        opt(whitespaceInPara),
+        opt(seq(regex(/:/),
+                opt(list(seq(and(regexPeek(/(?!\s*-)/),
+                                 whitespaceInPara),
+                             regex(/\S+/))))))));
+
+
+
+    var args = node(
+      'arguments',
+      seq(regex(/arguments:/i),
+          opt(seq(whitespaceInPara,
+                  expecting('-', regexPeek(/(?!\S)|-/)),
+                  opt(list(arg, whitespaceInPara)))),
+          paraBreak));
+
+    var main = seq(signature,
+                   opt(list(or(note,
+                               args,
+                               paragraph))));
 
     var docComment = node(
       'docComment',
       seq(whitespace, // skip initial whitespace
-          content,
+          main,
           // complain "expected paragraph" if we end looking
           // at more content
           expecting('paragraph', paraBreak)));
