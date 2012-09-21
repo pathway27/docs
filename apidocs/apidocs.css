@@ -1,0 +1,61 @@
+
+* { padding: 0; margin: 0; }
+html, body { height: 100%; }
+
+#topbar {
+  position: absolute;
+  width: 100%;
+  top: 0;
+  height: 39px;
+  border-bottom: 1px solid #555;
+  overflow: auto;
+  background: #cfc;
+  font-size: 12px;
+}
+
+#topbarinner {
+  padding: 7px;
+  font-family: sans-serif;
+}
+
+#main {
+  position: absolute;
+  width: 100%;
+  top: 40px;
+  bottom: 0;
+}
+
+#inputarea textarea {
+  border: 0;
+  border-right: 1px solid #555;
+  position: absolute;
+  height: 100%;
+  left: 0;
+  right: 50%;
+  font-family: monospace;
+  font-size: 100%;
+}
+
+#output {
+  position: absolute;
+  height: 100%;
+  left: 50%;
+  right: 0;
+  overflow: auto;
+}
+
+#inputarea textarea, #output {
+  line-height: 130%;
+}
+
+#output p, #output > div {
+  margin: 0.7em;
+}
+
+#output .sig { font-weight: bold; font-size: 120%; border-top: 3px solid black; border-bottom: 3px solid black;
+             padding: 5px; }
+#output .locus { float: right; }
+#output .arg { padding-left: 2em; }
+#output .argdescr { padding-left: 2em; }
+#output .argname { font-weight: bold; }
+#output .argtype { font-size: 80%; margin-left: 10px; background: #eee; color: #444; padding: 2px; border-radius: 4px;}

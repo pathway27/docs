@@ -1,0 +1,26 @@
+<head>
+  <title>apidocs</title>
+</head>
+
+<body>
+  {{> page}}
+</body>
+
+<template name="page">
+  <div id="topbar">
+    <div id="topbarinner">
+      This is a demo of doc comment processing for the new API docs.
+    </div>
+  </div>
+  <div id="main">
+    <div id="inputarea">{{!
+whitespace is significant here; browser swallows initial
+    newline in textarea
+}}<textarea>
+{{input}}</textarea>
+    </div>
+    <div id="output">
+      {{output}}
+    </div>
+  </div>
+</template>
