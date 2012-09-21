@@ -106,13 +106,17 @@
     var word = expecting('word', regex(/\w+/));
     var paragraph = node(
       'paragraph', list(word, whitespaceInPara));
-    var comment = node(
-      'comment',
-      seq(whitespace,
-          opt(list(seq(paragraph, paraBreak))),
+    var content = opt(list(seq(paragraph, paraBreak)));
+
+    var docComment = node(
+      'docComment',
+      seq(whitespace, // skip initial whitespace
+          content,
+          // complain "expected paragraph" if we end looking
+          // at more content
           expecting('paragraph', paraBreak)));
 
-    return comment.parseRequired(this);
+    return docComment.parseRequired(this);
   };
 
 })();
