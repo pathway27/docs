@@ -87,6 +87,77 @@ var processDocComment = function (input) {
   return html;
 };
 
+var scanMarkupLines = function (input) {
+  // Break input into lines and coallesce multi-line structures.
+  // These include code fences, which have their own delimiters,
+  // paragraphs, and bullets.
+  // The whitespace at the start of each line is set aside for
+  // inspection at subsequent steps.  Blockquote markers ('>')
+  // are considered part of the whitespace.
+  var lines = input.split('\n');
+  var lineData = [];
+  var lastLineDatum = null;
+  var i = 0;
+  while (i < lines.length) {
+    var line = lines[i];
+    var whitespace = line.match(/^\s*(>\s*)*/)[0];
+    var rest = line.slice(whitespace.length);
+    var indicatorMatch = rest.match(
+        /^(?:[*\-](?= )|#|<(?=[^>]*>$)|```|(.)?)/m);
+    var indicator = indicatorMatch[1] ? 'a' : indicatorMatch[0];
+    var data = { whitespace: whitespace,
+                 rest: rest,
+                 indicator: indicator };
+    i++;
+    if (indicator === "```") {
+      // code fence.  gobble up all succeeding lines
+      // until the closing fence.
+      var closed = false;
+      while (i < lines.length && ! closed) {
+        line = lines[i];
+        data.rest += '\n' + line;
+        if (/^\s*```/.test(line))
+          closed = true;
+        i++;
+      }
+      //if (! closed)
+      //throw new Error("Unclosed ``` fence");
+    } else if (indicator === 'a' && lastLineDatum) {
+      if (/^[a*\-]/.test(lastLineDatum.indicator)) {
+        // previous lineDatum can be continued.
+        // exclude whitespace (and '>')
+        lastLineDatum.rest += '\n' + rest;
+        // don't add a new lineDatum
+        continue;
+      }
+    }
+
+    lastLineDatum = data;
+    lineData.push(data);
+  }
+
+  return lineData;
+};
+
+var processMarkup = function (input) {
+  var lineData = scanMarkupLines(input);
+
+  // Process blockquotes based on varying levels of quoting.
+  // Code fences.
+  // Block tags.
+  // Headings.
+  // Bullets with nesting.
+
+  return _.map(lineData, function (data) {
+    var spaces = data.whitespace.match(/^\s*/)[0].length;
+    var quotes = data.whitespace.replace(/[^>]+/g, '');
+    return Handlebars._escape("(" + spaces +
+                              "," + quotes +
+                              "," + data.indicator +
+                              ") " + data.rest);
+  }).join('<br>');
+};
+
 if (Meteor.is_client) {
   Meteor.startup(function () {
     if (! Session.get("input"))
@@ -102,11 +173,13 @@ if (Meteor.is_client) {
 
     var html;
 //    try {
-      html = processDocComment(input);
+//      html = processDocComment(input);
 //    } catch (e) {
       // XXX
 //      html = 'ERROR';
 //    }
+
+    html = processMarkup(input);
 
     return new Handlebars.SafeString(html);
   };
