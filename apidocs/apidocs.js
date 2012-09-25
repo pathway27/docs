@@ -10,8 +10,9 @@ var processDocComment = function (input) {
   var content = docComment[1];
 
   try {
-    return Handlebars._escape(
-      ParseNode.stringify(new DocCommentParser(content).getTree()));
+//    return Handlebars._escape(
+//      ParseNode.stringify(new DocCommentParser(content).getTree()));
+    return processMarkup(content);
   } catch (e) {
     return Handlebars._escape(e.message);
   }
@@ -93,19 +94,20 @@ var scanMarkupLines = function (input) {
   // paragraphs, and bullets.
   // The whitespace at the start of each line is set aside for
   // inspection at subsequent steps.  Blockquote markers ('>')
-  // are considered part of the whitespace.
+  // are considered part of the whitespace.  Together they
+  // make up the "indent" property of the line data.
   var lines = input.split('\n');
   var lineData = [];
   var lastLineDatum = null;
   var i = 0;
   while (i < lines.length) {
     var line = lines[i];
-    var whitespace = line.match(/^\s*(>\s*)*/)[0];
-    var rest = line.slice(whitespace.length);
+    var indent = line.match(/^\s*(>\s*)*/)[0];
+    var rest = line.slice(indent.length);
     var indicatorMatch = rest.match(
         /^(?:[*\-](?= )|#|<(?=[^>]*>$)|```|(.)?)/m);
     var indicator = indicatorMatch[1] ? 'a' : indicatorMatch[0];
-    var data = { whitespace: whitespace,
+    var data = { indent: indent,
                  rest: rest,
                  indicator: indicator };
     i++;
@@ -120,6 +122,7 @@ var scanMarkupLines = function (input) {
           closed = true;
         i++;
       }
+      // XXX generate a warning for this?
       //if (! closed)
       //throw new Error("Unclosed ``` fence");
     } else if (indicator === 'a' && lastLineDatum) {
@@ -148,12 +151,22 @@ var processMarkup = function (input) {
   // Headings.
   // Bullets with nesting.
 
+  var types = {
+    'a': 'PARAGRAPH',
+    '*': 'BULLET',
+    '-': 'BULLET',
+    '#': 'HEADING',
+    '```': 'FENCE',
+    '<': 'SINGLETAG',
+    '': 'BLANK'
+  };
+
   return _.map(lineData, function (data) {
-    var spaces = data.whitespace.match(/^\s*/)[0].length;
-    var quotes = data.whitespace.replace(/[^>]+/g, '');
+    var spaces = data.indent.match(/^\s*/)[0].length;
+    var quotes = data.indent.replace(/[^>]+/g, '');
     return Handlebars._escape("(" + spaces +
                               "," + quotes +
-                              "," + data.indicator +
+                              "," + types[data.indicator] +
                               ") " + data.rest);
   }).join('<br>');
 };
@@ -172,14 +185,12 @@ if (Meteor.is_client) {
     var input = Session.get("input") || "";
 
     var html;
-//    try {
-//      html = processDocComment(input);
-//    } catch (e) {
-      // XXX
-//      html = 'ERROR';
-//    }
-
-    html = processMarkup(input);
+    try {
+      html = processDocComment(input);
+    } catch (e) {
+    // XXX
+      html = 'ERROR';
+    }
 
     return new Handlebars.SafeString(html);
   };
